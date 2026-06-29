@@ -1,0 +1,17 @@
+# Example package list for batch analysis
+# One package per line. Lines starting with # are ignored.
+# Format: <name>@<version>  or  <name>  (resolves to latest)
+#
+# Usage (future batch_fetch.py):
+#   python scripts/batch_fetch.py samples/package-list.example.txt
+
+# Well-known packages (for baseline comparison)
+lodash@4.17.21
+express@4.18.2
+
+# Scoped packages
+@babel/core@7.23.0
+
+# Packages to review (replace with actual targets)
+# suspicious-package@1.0.0
+# @scope/potentially-malicious@2.3.1
