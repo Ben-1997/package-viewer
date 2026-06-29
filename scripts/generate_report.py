@@ -66,18 +66,6 @@ def _scan_suspicious(ext_dir: pathlib.Path) -> list[dict]:
     return results
 
 
-def _md_table(headers: list[str], rows: list[list[str]]) -> str:
-    col_widths = [max(len(h), max((len(str(r[i])) for r in rows), default=0))
-                  for i, h in enumerate(headers)]
-    sep = "| " + " | ".join("-" * w for w in col_widths) + " |"
-    header = "| " + " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers)) + " |"
-    body_rows = [
-        "| " + " | ".join(str(r[i]).ljust(col_widths[i]) for i in range(len(headers))) + " |"
-        for r in rows
-    ]
-    return "\n".join([header, sep] + body_rows)
-
-
 def generate_report(name: str, version: str) -> str:
     pkg_dir = package_paths.package_dir(name, version)
     ext_dir = package_paths.extracted_dir(name, version)

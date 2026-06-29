@@ -57,7 +57,7 @@ def verify_integrity(path: pathlib.Path | str, integrity_string: str) -> bool:
         )
 
     # Pad base64 to a multiple of 4 to handle missing padding
-    padding = "=" * (4 - len(b64) % 4) if len(b64) % 4 else ""
+    padding = "=" * ((4 - len(b64) % 4) % 4)
     expected_bytes = base64.b64decode(b64 + padding)
 
     h = hashlib.new(algo)
