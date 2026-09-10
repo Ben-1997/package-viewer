@@ -15,11 +15,13 @@ Examples::
     python scripts/fetch_package.py lodash
     python scripts/fetch_package.py lodash@4.17.21
     python scripts/fetch_package.py @babel/core@7.23.0
+    python scripts/fetch_package.py left-pad@1.0.0 --archive-url https://example-archive.org/left-pad-1.0.0.tgz
 """
 import argparse
 import json
 import pathlib
 import sys
+from urllib.parse import urlparse
 
 # Add scripts/ to path so common modules are importable
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
@@ -49,6 +51,42 @@ def parse_package_arg(arg: str) -> tuple[str, str | None]:
     return name, version or None
 
 
+def get_archive_metadata(
+    name: str, version: str
+) -> tuple[dict | None, dict]:
+    """
+    Fetch matching registry metadata without preventing an archive fetch.
+
+    Args:
+        name: The npm package name.
+        version: The explicit archive version requested by the user.
+
+    Returns:
+        A tuple of version metadata (or ``None`` when it is unavailable) and
+        its integrity data (or an empty dictionary).
+    """
+    try:
+        full_meta = npm_registry.get_package_metadata(name)
+        metadata_version = npm_registry.resolve_version(full_meta, version)
+        if metadata_version != version:
+            print(
+                "[warn]  Registry version mismatch "
+                f"(requested {version!r}, resolved {metadata_version!r}); "
+                "writing a stub metadata file and skipping integrity verification.",
+                file=sys.stderr,
+            )
+            return None, {}
+        metadata = npm_registry.get_version_metadata(full_meta, metadata_version)
+        return metadata, npm_registry.get_integrity(metadata)
+    except Exception as exc:
+        print(
+            "[warn]  Registry metadata unavailable; writing a stub metadata "
+            f"file and skipping integrity verification: {exc}",
+            file=sys.stderr,
+        )
+        return None, {}
+
+
 def main() -> int:
     print(SAFETY_NOTICE)
     print()
@@ -72,39 +110,83 @@ def main() -> int:
         action="store_true",
         help="Only save registry metadata; do not download or extract the tarball",
     )
+    parser.add_argument(
+        "--archive-url",
+        metavar="URL",
+        help=(
+            "Fetch the tarball from this direct download link instead of the npm "
+            "registry. Requires an explicit package version and HTTPS URL. Use for "
+            "packages that have been removed from the registry."
+        ),
+    )
     args = parser.parse_args()
 
     name, version = parse_package_arg(args.package)
+    if args.archive_url is not None:
+        if version is None:
+            print(
+                "[error] --archive-url requires an explicit package version "
+                "(for example, left-pad@1.0.0).",
+                file=sys.stderr,
+            )
+            return 1
+        parsed_archive_url = urlparse(args.archive_url)
+        if parsed_archive_url.scheme != "https" or not parsed_archive_url.netloc:
+            print(
+                "[error] --archive-url must be a valid HTTPS URL.",
+                file=sys.stderr,
+            )
+            return 1
+
     print(f"[fetch] Package : {name}")
     print(f"[fetch] Version : {version or 'latest'}")
 
     # ── Fetch registry metadata ───────────────────────────────────────────────
-    print("[fetch] Querying registry.npmjs.org ...")
-    try:
-        full_meta = npm_registry.get_package_metadata(name)
-    except Exception as exc:
-        print(f"[error] Failed to fetch registry metadata: {exc}", file=sys.stderr)
-        return 1
+    version_meta = None
+    integrity = {}
+    if args.archive_url is not None:
+        print("[fetch] Querying registry metadata (best effort) ...")
+        resolved = version
+        version_meta, integrity = get_archive_metadata(name, version)
+        tarball_url = args.archive_url
+    else:
+        print("[fetch] Querying registry.npmjs.org ...")
+        try:
+            full_meta = npm_registry.get_package_metadata(name)
+        except Exception as exc:
+            print(f"[error] Failed to fetch registry metadata: {exc}", file=sys.stderr)
+            return 1
 
-    try:
-        resolved = npm_registry.resolve_version(full_meta, version)
-    except ValueError as exc:
-        print(f"[error] {exc}", file=sys.stderr)
-        return 1
+        try:
+            resolved = npm_registry.resolve_version(full_meta, version)
+        except ValueError as exc:
+            print(f"[error] {exc}", file=sys.stderr)
+            return 1
+
+        version_meta = npm_registry.get_version_metadata(full_meta, resolved)
+        tarball_url = npm_registry.get_tarball_url(version_meta)
+        integrity = npm_registry.get_integrity(version_meta)
 
     print(f"[fetch] Resolved version: {resolved}")
-
-    version_meta = npm_registry.get_version_metadata(full_meta, resolved)
-    tarball_url = npm_registry.get_tarball_url(version_meta)
-    integrity = npm_registry.get_integrity(version_meta)
 
     # ── Save metadata ─────────────────────────────────────────────────────────
     pkg_dir = package_paths.package_dir(name, resolved)
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     meta_path = package_paths.metadata_path(name, resolved)
+    if version_meta is None:
+        metadata_doc = {
+            "name": name,
+            "version": resolved,
+            "archive_url": args.archive_url,
+            "registry_metadata": "unavailable",
+        }
+    elif args.archive_url is not None:
+        metadata_doc = {**version_meta, "archive_url": args.archive_url}
+    else:
+        metadata_doc = version_meta
     with open(meta_path, "w", encoding="utf-8") as fh:
-        json.dump(version_meta, fh, indent=2)
+        json.dump(metadata_doc, fh, indent=2)
     print(f"[fetch] Metadata saved  : {meta_path}")
 
     if args.metadata_only:
