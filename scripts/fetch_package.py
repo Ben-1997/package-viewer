@@ -103,11 +103,14 @@ def main() -> int:
         resolved = version
         try:
             full_meta = npm_registry.get_package_metadata(name)
-            resolved = npm_registry.resolve_version(full_meta, version)
-            metadata = npm_registry.get_version_metadata(full_meta, resolved)
+            metadata_version = npm_registry.resolve_version(full_meta, version)
+            metadata = npm_registry.get_version_metadata(full_meta, metadata_version)
             integrity_data = npm_registry.get_integrity(metadata)
         except Exception as exc:
-            print(f"[warn]  Registry metadata unavailable: {exc}")
+            print(
+                "[warn]  Registry metadata unavailable; writing a stub metadata "
+                f"file and skipping integrity verification: {exc}"
+            )
         else:
             version_meta = metadata
             integrity = integrity_data
@@ -136,19 +139,18 @@ def main() -> int:
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     meta_path = package_paths.metadata_path(name, resolved)
+    metadata_doc = (
+        version_meta
+        if version_meta is not None
+        else {
+            "name": name,
+            "version": resolved,
+            "archive_url": args.archive_url,
+            "registry_metadata": "unavailable",
+        }
+    )
     with open(meta_path, "w", encoding="utf-8") as fh:
-        json.dump(
-            version_meta
-            if version_meta is not None
-            else {
-                "name": name,
-                "version": resolved,
-                "archive_url": args.archive_url,
-                "registry_metadata": "unavailable",
-            },
-            fh,
-            indent=2,
-        )
+        json.dump(metadata_doc, fh, indent=2)
     print(f"[fetch] Metadata saved  : {meta_path}")
 
     if args.metadata_only:
