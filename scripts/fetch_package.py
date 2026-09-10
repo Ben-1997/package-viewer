@@ -104,12 +104,6 @@ def main() -> int:
         try:
             full_meta = npm_registry.get_package_metadata(name)
             metadata_version = npm_registry.resolve_version(full_meta, version)
-            metadata = npm_registry.get_version_metadata(full_meta, metadata_version)
-            if metadata_version != version:
-                raise ValueError(
-                    f"registry resolved {version!r} to {metadata_version!r}"
-                )
-            integrity_data = npm_registry.get_integrity(metadata)
         except Exception as exc:
             print(
                 "[warn]  Registry metadata unavailable; writing a stub metadata "
@@ -117,8 +111,25 @@ def main() -> int:
                 file=sys.stderr,
             )
         else:
-            version_meta = metadata
-            integrity = integrity_data
+            if metadata_version != version:
+                print(
+                    "[warn]  Registry version mismatch; writing a stub metadata "
+                    "file and skipping integrity verification.",
+                    file=sys.stderr,
+                )
+            else:
+                try:
+                    metadata = npm_registry.get_version_metadata(full_meta, metadata_version)
+                    integrity_data = npm_registry.get_integrity(metadata)
+                except Exception as exc:
+                    print(
+                        "[warn]  Registry metadata unavailable; writing a stub metadata "
+                        f"file and skipping integrity verification: {exc}",
+                        file=sys.stderr,
+                    )
+                else:
+                    version_meta = metadata
+                    integrity = integrity_data
         tarball_url = args.archive_url
     else:
         try:
