@@ -99,4 +99,33 @@ def test_archive_url_uses_registry_metadata_when_available(monkeypatch, tmp_path
     )
 
     assert fetch_package.main() == 0
-    assert json.loads((pkg_dir / "metadata.json").read_text()) == version_meta
+    assert json.loads((pkg_dir / "metadata.json").read_text()) == {
+        **version_meta,
+        "archive_url": archive_url,
+    }
+
+
+def test_archive_url_ignores_mismatched_registry_metadata(monkeypatch, tmp_path, capsys):
+    pkg_dir = _configure_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fetch_package.py",
+            "left-pad@1.0.0",
+            "--archive-url",
+            "https://archive.test/left-pad-1.0.0.tgz",
+            "--metadata-only",
+        ],
+    )
+    monkeypatch.setattr(fetch_package.npm_registry, "get_package_metadata", lambda _: {})
+    monkeypatch.setattr(fetch_package.npm_registry, "resolve_version", lambda *_: "1.0.1")
+    monkeypatch.setattr(
+        fetch_package.npm_registry,
+        "get_version_metadata",
+        lambda *_: (_ for _ in ()).throw(AssertionError("must not use mismatched metadata")),
+    )
+
+    assert fetch_package.main() == 0
+    assert json.loads((pkg_dir / "metadata.json").read_text())["registry_metadata"] == "unavailable"
+    assert "Registry version mismatch" in capsys.readouterr().err
