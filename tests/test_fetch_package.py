@@ -70,7 +70,7 @@ def test_archive_url_continues_without_registry_metadata(monkeypatch, tmp_path, 
     assert (pkg_dir / "file-listing.txt").read_text() == "package/index.js\n"
     assert (
         "[warn]  Registry metadata unavailable; writing a stub metadata file and "
-        "skipping integrity verification: 404 Not Found" in capsys.readouterr().out
+        "skipping integrity verification: 404 Not Found" in capsys.readouterr().err
     )
 
 
@@ -93,7 +93,7 @@ def test_archive_url_uses_registry_metadata_when_available(monkeypatch, tmp_path
     monkeypatch.setattr(
         fetch_package.npm_registry, "get_package_metadata", lambda _: registry_meta
     )
-    monkeypatch.setattr(fetch_package.npm_registry, "resolve_version", lambda *_: "1.0.1")
+    monkeypatch.setattr(fetch_package.npm_registry, "resolve_version", lambda *_: "1.0.0")
     monkeypatch.setattr(
         fetch_package.npm_registry, "get_version_metadata", lambda *_: version_meta
     )
