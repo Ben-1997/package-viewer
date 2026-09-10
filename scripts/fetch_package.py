@@ -70,8 +70,9 @@ def get_archive_metadata(
         metadata_version = npm_registry.resolve_version(full_meta, version)
         if metadata_version != version:
             print(
-                "[warn]  Registry version mismatch; writing a stub metadata "
-                "file and skipping integrity verification.",
+                "[warn]  Registry version mismatch "
+                f"(requested {version!r}, resolved {metadata_version!r}); "
+                "writing a stub metadata file and skipping integrity verification.",
                 file=sys.stderr,
             )
             return None, {}
@@ -120,14 +121,14 @@ def main() -> int:
     args = parser.parse_args()
 
     name, version = parse_package_arg(args.package)
-    if args.archive_url is not None and version is None:
-        print(
-            "[error] --archive-url requires an explicit package version "
-            "(for example, left-pad@1.0.0).",
-            file=sys.stderr,
-        )
-        return 1
     if args.archive_url is not None:
+        if version is None:
+            print(
+                "[error] --archive-url requires an explicit package version "
+                "(for example, left-pad@1.0.0).",
+                file=sys.stderr,
+            )
+            return 1
         parsed_archive_url = urlparse(args.archive_url)
         if parsed_archive_url.scheme != "https" or not parsed_archive_url.netloc:
             print(
@@ -140,14 +141,15 @@ def main() -> int:
     print(f"[fetch] Version : {version or 'latest'}")
 
     # ── Fetch registry metadata ───────────────────────────────────────────────
-    print("[fetch] Querying registry.npmjs.org ...")
     version_meta = None
     integrity = {}
     if args.archive_url is not None:
+        print("[fetch] Querying registry metadata (best effort) ...")
         resolved = version
         version_meta, integrity = get_archive_metadata(name, version)
         tarball_url = args.archive_url
     else:
+        print("[fetch] Querying registry.npmjs.org ...")
         try:
             full_meta = npm_registry.get_package_metadata(name)
         except Exception as exc:
