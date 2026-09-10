@@ -36,6 +36,22 @@ def test_archive_url_requires_explicit_version(monkeypatch, capsys):
     assert "--archive-url requires an explicit package version" in capsys.readouterr().err
 
 
+def test_archive_url_requires_https(monkeypatch, capsys):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fetch_package.py",
+            "left-pad@1.0.0",
+            "--archive-url",
+            "http://archive.test/package.tgz",
+        ],
+    )
+
+    assert fetch_package.main() == 1
+    assert "--archive-url must be a valid HTTPS URL" in capsys.readouterr().err
+
+
 def test_archive_url_continues_without_registry_metadata(monkeypatch, tmp_path, capsys):
     pkg_dir = _configure_paths(monkeypatch, tmp_path)
     archive_url = "https://archive.test/left-pad-1.0.0.tgz"

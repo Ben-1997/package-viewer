@@ -21,6 +21,7 @@ import argparse
 import json
 import pathlib
 import sys
+from urllib.parse import urlparse
 
 # Add scripts/ to path so common modules are importable
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
@@ -53,7 +54,17 @@ def parse_package_arg(arg: str) -> tuple[str, str | None]:
 def get_archive_metadata(
     name: str, version: str
 ) -> tuple[dict | None, dict]:
-    """Fetch matching registry metadata without preventing an archive fetch."""
+    """
+    Fetch matching registry metadata without preventing an archive fetch.
+
+    Args:
+        name: The npm package name.
+        version: The explicit archive version requested by the user.
+
+    Returns:
+        A tuple of version metadata (or ``None`` when it is unavailable) and
+        its integrity data (or an empty dictionary).
+    """
     try:
         full_meta = npm_registry.get_package_metadata(name)
         metadata_version = npm_registry.resolve_version(full_meta, version)
@@ -116,6 +127,14 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    if args.archive_url is not None:
+        parsed_archive_url = urlparse(args.archive_url)
+        if parsed_archive_url.scheme != "https" or not parsed_archive_url.netloc:
+            print(
+                "[error] --archive-url must be a valid HTTPS URL.",
+                file=sys.stderr,
+            )
+            return 1
 
     print(f"[fetch] Package : {name}")
     print(f"[fetch] Version : {version or 'latest'}")
