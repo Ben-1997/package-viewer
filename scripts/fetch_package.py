@@ -115,7 +115,8 @@ def main() -> int:
         metavar="URL",
         help=(
             "Fetch the tarball from this direct download link instead of the npm "
-            "registry. Use for packages that have been removed from the registry."
+            "registry. Requires an explicit package version and HTTPS URL. Use for "
+            "packages that have been removed from the registry."
         ),
     )
     args = parser.parse_args()
