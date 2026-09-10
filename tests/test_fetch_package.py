@@ -129,3 +129,21 @@ def test_archive_url_ignores_mismatched_registry_metadata(monkeypatch, tmp_path,
     assert fetch_package.main() == 0
     assert json.loads((pkg_dir / "metadata.json").read_text())["registry_metadata"] == "unavailable"
     assert "Registry version mismatch" in capsys.readouterr().err
+
+
+def test_registry_fetch_metadata_is_unchanged(monkeypatch, tmp_path):
+    pkg_dir = _configure_paths(monkeypatch, tmp_path)
+    version_meta = {"name": "left-pad", "version": "1.0.0"}
+    monkeypatch.setattr(
+        sys, "argv", ["fetch_package.py", "left-pad@1.0.0", "--metadata-only"]
+    )
+    monkeypatch.setattr(fetch_package.npm_registry, "get_package_metadata", lambda _: {})
+    monkeypatch.setattr(fetch_package.npm_registry, "resolve_version", lambda *_: "1.0.0")
+    monkeypatch.setattr(
+        fetch_package.npm_registry, "get_version_metadata", lambda *_: version_meta
+    )
+    monkeypatch.setattr(fetch_package.npm_registry, "get_tarball_url", lambda _: "unused")
+    monkeypatch.setattr(fetch_package.npm_registry, "get_integrity", lambda _: {})
+
+    assert fetch_package.main() == 0
+    assert json.loads((pkg_dir / "metadata.json").read_text()) == version_meta

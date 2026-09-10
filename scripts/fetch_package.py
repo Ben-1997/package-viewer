@@ -152,16 +152,17 @@ def main() -> int:
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     meta_path = package_paths.metadata_path(name, resolved)
-    metadata_doc = (
-        {**version_meta, "archive_url": args.archive_url}
-        if version_meta is not None
-        else {
+    if version_meta is None:
+        metadata_doc = {
             "name": name,
             "version": resolved,
             "archive_url": args.archive_url,
             "registry_metadata": "unavailable",
         }
-    )
+    elif args.archive_url is not None:
+        metadata_doc = {**version_meta, "archive_url": args.archive_url}
+    else:
+        metadata_doc = version_meta
     with open(meta_path, "w", encoding="utf-8") as fh:
         json.dump(metadata_doc, fh, indent=2)
     print(f"[fetch] Metadata saved  : {meta_path}")
